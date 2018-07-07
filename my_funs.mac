@@ -1,0 +1,1327 @@
+/*
+load("C:/.../my_funs.mac");
+*/
+
+/*
+Matrix Eigenvalues
+Input:
+K Matrix
+Output:
+eigvalues list of eigenvalues
+*/
+eigenvalues_num(K):=
+block([lam,eqn,eigs,eigvalues,i],
+/* establish the characteristics polynomial */
+eqn : determinant(K - lam*ident(length(K))),
+/* find "eqn" roots numerically */
+eigs : allroots(eqn),
+/* initialize "eigvalues" */
+eigvalues : zeromatrix(1,length(K)),
+/* fill "eigvalues" using the components of "eigs" */
+i : 1,
+for elm in eigs do (
+eigvalues[1,i] : rhs(elm),
+i : i + 1
+),
+return(eigvalues)
+)$
+
+
+/*
+Rod Element Stiffness Matrix - XY Plane
+Inputs:
+ncoor Nodal coordinates
+Em Young’s modulus
+A Cross-section area
+Output:
+Ke Stiffness matrix
+*/
+K_el_rod_xy(ncoor,Em,A):=
+block([x1,x2,y1,y2,x21,y21,EA,L,LL,LLL,Ke],
+[[x1,y1],[x2,y2]] : ncoor,
+[x21,y21] : [x2-x1,y2-y1],
+EA : Em*A,
+LL : (x21^2+y21^2),
+L : sqrt(LL),
+LLL:LL*L,
+Ke : (EA/LLL)*matrix([ x21*x21, x21*y21,-x21*x21,-x21*y21],
+[ y21*x21, y21*y21,-y21*x21,-y21*y21],
+[-x21*x21,-x21*y21, x21*x21, x21*y21],
+[-y21*x21,-y21*y21, y21*x21, y21*y21]),
+return(Ke)
+)$
+
+/*
+Rod Element Stiffness Matrix - XZ Plane
+Inputs:
+ncoor Nodal coordinates
+Em Young’s modulus
+A Cross-section area
+Output:
+Ke Stiffness matrix
+*/
+K_el_rod_xz(ncoor,Em,A):=
+block([x1,x2,z1,z2,x21,z21,EA,L,LL,LLL,Ke],
+[[x1,z1],[x2,z2]] : ncoor,
+[x21,z21] : [x2-x1,z2-z1],
+EA : Em*A,
+LL : (x21^2+z21^2),
+L : sqrt(LL),
+LLL:LL*L,
+Ke : (EA/LLL)*matrix([ x21*x21, x21*z21,-x21*x21,-x21*z21],
+[ z21*x21, z21*z21,-z21*x21,-z21*z21],
+[-x21*x21,-x21*z21, x21*x21, x21*z21],
+[-z21*x21,-z21*z21, z21*x21, z21*z21]),
+return(Ke)
+)$
+
+/*
+Generalized Beam Element Stiffness Matrix - XY Plane
+Inputs:
+ncoor Nodal coordinates
+Em Young’s modulus
+A Cross-section area
+Izz Second moment of area
+Output:
+Ke Stiffness matrix
+*/
+K_el_gen_Beam_xy(ncoor,Em,A,Izz):=
+block([x1,x2,y1,y2,x21,y21,EA,EI,L,LL,LLL,Te,Kebar,Ke],
+[[x1,y1],[x2,y2]] : ncoor,
+[x21,y21] : [x2-x1,y2-y1],
+EA : Em*A,
+EI : Em*Izz,
+LL : (x21^2+y21^2),
+L : sqrt(LL),
+LLL : LL*L,
+Kebar : (EA/L)*matrix([1,0,0,-1,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0],
+[-1,0,0,1,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0]) +
+(2*EI/LLL)*matrix(
+[0,0,0,0,0,0],[0, 6, 3*L,0,-6,3*L],[0,3*L,2*LL,0,-3*L, LL],
+[0,0,0,0,0,0],[0,-6,-3*L,0, 6,-3*L],[0,3*L,LL,0,-3*L,2*LL]),
+Te : matrix([x21,y21,0,0,0,0]/L,[-y21,x21,0,0,0,0]/L,[0,0,1,0,0,0],
+[0,0,0,x21,y21,0]/L,[0,0,0,-y21,x21,0]/L,[0,0,0,0,0,1]),
+Ke : transpose(Te) . Kebar . Te,
+return(Ke)
+)$
+
+/*
+Generalized Beam Element Stiffness Matrix - XZ Plane
+Inputs:
+ncoor Nodal coordinates
+Em Young’s modulus
+A Cross-section area
+Iyy Second moment of area
+Output:
+Ke Stiffness matrix
+*/
+K_el_gen_Beam_xz(ncoor,Em,A,Iyy):=
+block([x1,x2,z1,z2,x21,z21,EA,EI,L,LL,LLL,Te,Kebar,Ke],
+[[x1,z1],[x2,z2]] : ncoor,
+[x21,z21] : [x2-x1,z2-z1],
+EA : Em*A,
+EI : Em*Iyy,
+LL : (x21^2+z21^2),
+L : sqrt(LL),
+LLL : LL*L,
+Kebar : (EA/L)*matrix([1,0,0,-1,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0],
+[-1,0,0,1,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0]) +
+(2*EI/LLL)*matrix(
+[0,0,0,0,0,0],[0,6,-3*L,0,-6,-3*L],[0,-3*L,2*LL,0,3*L, LL],
+[0,0,0,0,0,0],[0,-6, 3*L,0, 6, 3*L],[0,-3*L,LL,0,3*L,2*LL]),
+Te :matrix([x21,z21,0,0,0,0]/L,[-z21,x21,0,0,0,0]/L,[0,0,1,0,0,0],
+[0,0,0,x21,z21,0]/L,[0,0,0,-z21,x21,0]/L,[0,0,0,0,0,1]),
+Ke : transpose(Te) . Kebar . Te,
+return(Ke)
+)$
+
+/*
+Generalized Timoshenko Beam Element Stiffness Matrix - XY Plane
+Inputs:
+ncoor Nodal coordinates
+Em Young’s modulus
+A Cross-section area
+Izz Second moment of area
+Ks Timoshenko shear coefficient
+G Shear modulus
+Output:
+Ke Stiffness matrix
+*/
+K_el_timoshenko_gen_Beam_xy(ncoor,Em,A,Izz,Ks,G):=
+block([x1,x2,y1,y2,x21,y21,EA,EI,L,LL,KSAG,Te,Kebar,Ke],
+[[x1,y1],[x2,y2]] : ncoor,
+[x21,y21] : [x2-x1,y2-y1],
+EA : Em*A,
+EI : Em*Izz,
+LL : (x21^2+y21^2),
+L : sqrt(LL),
+KSAG : Ks*A*G,
+Kebar : (EA/L)*
+matrix([ 1,0,0,-1,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0],
+[-1,0,0, 1,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0])+
+matrix(
+[0,0,0,0,0,0],
+[0, KSAG/L, KSAG/2, 0,-KSAG/L, KSAG/2],
+[0, KSAG/2,(KSAG*L/3)+(EI/L),0,-KSAG/2,(KSAG*L/6)-(EI/L)],
+[0,0,0,0,0,0],
+[0,-KSAG/L,KSAG/2,0,KSAG/L,-KSAG/2],
+[0,KSAG/2,(KSAG*L/6)-(EI/L),0,-KSAG/2,(KSAG*L/3)+(EI/L)]),
+Te :matrix([x21,y21,0,0,0,0]/L,[-y21,x21,0,0,0,0]/L,[0,0,1,0,0,0],
+[0,0,0,x21,y21,0]/L,[0,0,0,-y21,x21,0]/L,[0,0,0,0,0,1]),
+Ke : transpose(Te) . Kebar . Te,
+return(Ke)
+)$
+
+/*
+Generalized Timoshenko Beam Element Stiffness Matrix - XZ Plane
+Inputs:
+ncoor Nodal coordinates
+Em Young’s modulus
+A Cross-section area
+Iyy Second moment of area
+Ks Timoshenko shear coefficient
+G Shear modulus
+Output:
+Ke Stiffness matrix
+*/
+K_el_timoshenko_gen_Beam_xz(ncoor,Em,A,Iyy,Ks,G):=
+block([x1,x2,z1,z2,x21,z21,EA,EI,L,LL,KSAG,Te,Kebar,Ke],
+[[x1,z1],[x2,z2]] : ncoor,
+[x21,z21] : [x2-x1,z2-z1],
+EA : Em*A,
+EI : Em*Iyy,
+LL : (x21^2+z21^2),
+L : sqrt(LL),
+KSAG : Ks*A*G,
+Kebar : (EA/L)*
+matrix([ 1,0,0,-1,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0],
+[-1,0,0, 1,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0])+
+matrix(
+[0,0,0,0,0,0],
+[0, KSAG/L, -KSAG/2, 0,-KSAG/L, -KSAG/2],
+[0, -KSAG/2,(KSAG*L/3)+(EI/L),0,KSAG/2,(KSAG*L/6)-(EI/L)],
+[0,0,0,0,0,0],
+[0,-KSAG/L,KSAG/2,0,KSAG/L,KSAG/2],
+[0,-KSAG/2,(KSAG*L/6)-(EI/L),0,KSAG/2,(KSAG*L/3)+(EI/L)]),
+Te :matrix([x21,z21,0,0,0,0]/L,[-z21,x21,0,0,0,0]/L,[0,0,1,0,0,0],
+[0,0,0,x21,z21,0]/L,[0,0,0,-z21,x21,0]/L,[0,0,0,0,0,1]),
+Ke : transpose(Te) . Kebar . Te,
+return(Ke)
+)$
+
+/*
+Space Truss Global (Master) Stiffness Matrix - XY Plane
+Inputs:
+nodxy Nodal coordinates
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+Output:
+K Global (Master) Stiffness matrix
+*/
+K_gl_truss_xy(nodxy,elenod,elemat,elefab):=
+block([numele,numnod,neldof,e,eftab,ni,nj,i,j,ii,jj,ncoor,Em,A,Ke,K],
+numele : length(elenod),
+numnod : length(nodxy),
+K : zeromatrix(2*numnod, 2*numnod),
+for e:1 thru numele do (
+[ni,nj] : elenod[e],
+eftab : [2*ni-1,2*ni,2*nj-1,2*nj],
+ncoor : [nodxy[ni],nodxy[nj]],
+Em : elemat[e],
+A : elefab[e],
+Ke : K_el_rod_xy(ncoor,Em,A),
+neldof: length(Ke),
+for i:1 thru neldof do(
+ii : eftab[i],
+for j:1 thru neldof do(
+jj : eftab[j],
+K[ii,jj] : K[ii,jj]+Ke[i,j]
+)
+)
+),
+return(K)
+)$
+
+/*
+Space Truss Global (Master) Stiffness Matrix - XZ Plane
+Inputs:
+nodxz Nodal coordinates
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+Output:
+K Global (Master) Stiffness matrix
+*/
+K_gl_truss_xz(nodxz,elenod,elemat,elefab):=
+block([numele,numnod,neldof,e,eftab,ni,nj,i,j,ii,jj,ncoor,Em,A,Ke,K],
+numele : length(elenod),
+numnod : length(nodxz),
+K : zeromatrix(2*numnod, 2*numnod),
+for e:1 thru numele do (
+[ni,nj] : elenod[e],
+eftab : [2*ni-1,2*ni,2*nj-1,2*nj],
+ncoor : [nodxz[ni],nodxz[nj]],
+Em : elemat[e],
+A : elefab[e],
+Ke : K_el_rod_xz(ncoor,Em,A),
+neldof: length(Ke),
+for i:1 thru neldof do(
+ii : eftab[i],
+for j:1 thru neldof do(
+jj : eftab[j],
+K[ii,jj] : K[ii,jj]+Ke[i,j]
+)
+)
+),
+return(K)
+)$
+
+/*
+Boundary conditions definition (applied forces matrix)
+Inputs:
+nodtag Nodal freedom tags list
+nodval Nodal freedom values list
+Output:
+f Applied force matrix
+*/
+AppliedForceVector(nodtag,nodval):=
+block([i,ftag,fval,numdof,f],
+[ftag,fval] : [flatten(nodtag), flatten(nodval)],
+numdof : length(ftag),
+f : makelist(0,numdof),
+for i:1 thru numdof do (
+if (is(equal(ftag[i], 0))) then f[i] : fval[i]
+),
+return(f)
+)$
+
+/*
+Modified Global (Master) Stiffness Matrix
+Inputs:
+nodtag Nodal freedom tags list
+K Global (master) stiffness matrix
+Output:
+Kmod Modified global (master) stiffness matrix
+*/
+ModifiedMasterStiffness(nodtag,K) :=
+block([i,j,k,n:length(K),pdof,np,Kmod:copymatrix(K)],
+pdof : PrescDispDOFTags(nodtag),
+np : length(pdof),
+for k : 1 thru np do (
+i : pdof[k],
+for j : 1 thru n do (
+Kmod [i,j] : Kmod [j,i] : 0
+),
+Kmod[i,i] : 1
+),
+return(Kmod)
+)$
+
+/*
+Modified Nodal Forces Matrix
+Inputs:
+nodtag Nodal freedom tags list
+nodval Nodal freedom values list
+K Global (master) stiffness matrix
+f Global (master) force matrix
+Output:
+fmod Modified global (master) force matrix
+*/
+ModifiedNodeForces(nodtag,nodval,K,f) :=
+block([i,j,k,n:length(K),pdof,pval,np,d,c,fmod:copymatrix(f)],
+pdof : PrescDispDOFTags(nodtag),
+np : length(pdof),
+pval : PrescDispDOFValues(nodtag, nodval),
+c : makelist(1,n),
+for k : 1 thru np do (
+i : pdof[k],
+c[i] : 0
+),
+for k : 1 thru np do (
+i : pdof[k],
+d : pval[k],
+fmod[i,1] : d,
+if (d#0) then (
+for j : 1 thru n do (
+fmod[j,1] : fmod[j,1] - K[i,j]*c[j]*d
+))
+),
+return(fmod)
+)$
+
+/*
+(Prescribed) Displacement DOF Tags
+Inputs:
+nodtag Nodal freedom tags list
+Output:
+pdof Prescribed displacement DOF tags list
+*/
+PrescDispDOFTags(nodtag) :=
+block([j,n,numnod:length(nodtag),pdof:[],k:0,m],
+for n : 1 thru numnod do (
+m : length(nodtag[n]),
+for j : 1 thru m do (
+if (is(nodtag[n][j] > 0)) then pdof : append(pdof, [k+j])
+),
+k : k + m
+),
+return(pdof)
+);
+
+/*
+(Prescribed) Displacement DOF Values
+Inputs:
+nodtag Nodal freedom tags list
+nodval Nodal freedom values list
+Output:
+pval Prescribed displacement DOF values
+*/
+PrescDispDOFValues(nodtag,nodval) :=
+block([j,n,numnod:length(nodtag),pval:[],k:0,m],
+for n : 1 thru numnod do (
+m : length(nodtag[n]),
+for j : 1 thru m do (
+if (is(nodtag[n][j] > 0)) then pval : append(pval,[nodval[n][j]])
+),
+k : k + m
+),
+return(pval)
+)$
+
+/*
+Flattening an array
+Inputs:
+nv input array
+Output:
+nv flattened array
+*/
+FlatNodeVector(nv) := flatten(nv)$
+
+
+/*
+Internal Forces - XY Plane (for all the elements)
+Inputs:
+nodxy Nodal coordinates
+noddis Nodal displacements
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+Output:
+p Internal forces
+*/
+PlaneTrussIntForces_xy(nodxy,elenod,elemat,elefab,noddis) :=
+block([numele:length(elenod),e,ni,nj,ncoor,Em,A,ue,p],
+p : makelist(0, numele),
+for e : 1 thru numele do (
+[ni,nj] : elenod[e],
+ncoor : [nodxy[ni],nodxy[nj]],
+ue : flatten([noddis[ni],noddis[nj]]),
+Em : elemat[e],
+A : elefab[e],
+p[e] : PlaneBar2IntForce_xy(ncoor,Em,A,ue)
+),
+return(p)
+)$
+
+/*
+Internal Forces - XZ Plane (for all the elements)
+Inputs:
+nodxz Nodal coordinates
+noddis Nodal displacements
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+Output:
+p Internal forces
+*/
+PlaneTrussIntForces_xz(nodxz,elenod,elemat,elefab,noddis) :=
+block([numele:length(elenod),e,ni,nj,ncoor,Em,A,ue,p],
+p : makelist(0, numele),
+for e : 1 thru numele do (
+[ni,nj] : elenod[e],
+ncoor : [nodxz[ni],nodxz[nj]],
+ue : flatten([noddis[ni],noddis[nj]]),
+Em : elemat[e],
+A : elefab[e],
+p[e] : PlaneBar2IntForce_xz(ncoor,Em,A,ue)
+),
+return(p)
+)$
+
+/*
+Internal Force - XY Plane (for one element)
+Inputs:
+ncoor Nodal coordinates
+Em Young’s modulus
+A Cross-section area
+ue Nodal displacements
+Output:
+pe Element internal force
+*/
+PlaneBar2IntForce_xy(ncoor,Em,A,ue) :=
+block([x1,x2,y1,y2,x21,y21,EA,LL,pe],
+[[x1,y1],[x2,y2]] : ncoor,
+[x21,y21] : [x2-x1,y2-y1],
+EA : Em*A,
+LL : x21^2 + y21^2,
+pe : (EA/LL)*(x21*(ue[3]-ue[1]) + y21*(ue[4]-ue[2])),
+return(pe)
+)$
+
+/*
+Internal Force - XZ Plane (for one element)
+Inputs:
+ncoor Nodal coordinates
+Em Young’s modulus
+A Cross-section area
+ue Nodal displacements
+Output:
+pe Element internal force
+*/
+PlaneBar2IntForce_xz(ncoor,Em,A,ue) :=
+block([x1,x2,z1,z2,x21,z21,EA,LL,pe],
+[[x1,z1],[x2,z2]] : ncoor,
+[x21,z21] : [x2-x1,z2-z1],
+EA : Em*A,
+LL : x21^2 + z21^2,
+pe : (EA/LL)*(x21*(ue[3]-ue[1]) + z21*(ue[4]-ue[2])),
+return(pe)
+)$
+
+/*
+Element stresses
+Inputs:
+elefab Element fabrication properties
+elefor Element internal force
+Output:
+elesig Element stress
+*/
+PlaneTrussStresses(elefab,elefor) :=
+block([numele:length(elefab),e,elesig],
+elesig : makelist(0,numele),
+for e : 1 thru numele do (
+elesig[e] : elefor[e]/elefab[e]
+),
+return(elesig)
+)$
+
+/*
+Generalized Beam Global (Master) Stiffness Matrix - XY Plane
+Inputs:
+nodxy Nodal coordinates
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+Output:
+K Global (Master) Stiffness matrix
+*/
+K_gl_beam_xy(nodxy,elenod,elemat,elefab):=
+block(
+[numele,numnod,neldof,e,eftab,ni,nj,i,j,ii,jj,ncoor,Em,A,Izz,Ke,K],
+numele : length(elenod),
+numnod : length(nodxy),
+K : zeromatrix(3*numnod, 3*numnod),
+for e:1 thru numele do (
+[ni,nj] : elenod[e],
+eftab : [3*ni-2,3*ni-1,3*ni,3*nj-2,3*nj-1,3*nj],
+ncoor : [nodxy[ni],nodxy[nj]],
+Em : elemat[e][1],
+[A,Izz] : elefab[e],
+Ke : K_el_gen_Beam_xy(ncoor,Em,A,Izz),
+neldof: length(Ke),
+for i:1 thru neldof do(
+ii : eftab[i],
+for j:1 thru neldof do(
+jj : eftab[j],
+K[ii,jj] : K[ii,jj]+Ke[i,j]
+)
+)
+),
+return(K)
+)$
+
+/*
+Generalized Beam Global (Master) Stiffness Matrix - XZ Plane
+Inputs:
+nodxz Nodal coordinates
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+Output:
+K Global (Master) Stiffness matrix
+*/
+K_gl_beam_xz(nodxz, elenod,elemat,elefab):=
+block(
+[numele,numnod,neldof,e,eftab,ni,nj,i,j,ii,jj,ncoor,Em,A,Iyy,Ke,K],
+numele : length(elenod),
+numnod : length(nodxz),
+K : zeromatrix(3*numnod, 3*numnod),
+for e:1 thru numele do (
+[ni,nj] : elenod[e],
+eftab : [3*ni-2,3*ni-1,3*ni,3*nj-2,3*nj-1,3*nj],
+ncoor : [nodxz[ni],nodxz[nj]],
+Em : elemat[e][1],
+[A,Iyy] : elefab[e],
+Ke : K_el_gen_Beam_xz(ncoor,Em,A,Iyy),
+neldof: length(Ke),
+for i:1 thru neldof do(
+ii : eftab[i],
+for j:1 thru neldof do(
+jj : eftab[j],
+K[ii,jj] : K[ii,jj]+Ke[i,j]
+)
+)
+),
+return(K)
+)$
+
+/*
+Generalized Timoshenko Beam Global (Master) Stiffness Matrix - XY Plane
+Inputs:
+nodxy Nodal coordinates
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+Output:
+K Global (Master) Stiffness matrix
+*/
+K_gl_timoshenko_beam_xy(nodxy,elenod,elemat,elefab):=
+block(
+[numele,numnod,neldof,e,eftab,ni,nj,i,j,ii,jj,ncoor,Em,A,Ks,G,Ke,K],
+numele : length(elenod),
+numnod : length(nodxy),
+K : zeromatrix(3*numnod, 3*numnod),
+for e:1 thru numele do (
+[ni,nj] : elenod[e],
+eftab : [3*ni-2,3*ni-1,3*ni,3*nj-2,3*nj-1,3*nj],
+ncoor : [nodxy[ni],nodxy[nj]],
+[Em,G] : elemat[e],
+[A,Izz,Ks] : elefab[e],
+Ke : K_el_timoshenko_gen_Beam_xy(ncoor,Em,A,Izz,Ks,G),
+neldof: length(Ke),
+for i:1 thru neldof do(
+ii : eftab[i],
+for j:1 thru neldof do(
+jj : eftab[j],
+K[ii,jj] : K[ii,jj]+Ke[i,j]
+)
+)
+),
+return(K)
+)$
+
+/*
+Generalized Timoshenko Beam Global (Master) Stiffness Matrix - XZ Plane
+Inputs:
+nodxz Nodal coordinates
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+Output:
+K Global (Master) Stiffness matrix
+*/
+K_gl_timoshenko_beam_xz(nodxz,elenod,elemat,elefab):=
+block(
+[numele,numnod,neldof,e,eftab,ni,nj,i,j,ii,jj,ncoor,Em,A,Ks,G,Ke,K],
+numele : length(elenod),
+numnod : length(nodxz),
+K : zeromatrix(3*numnod, 3*numnod),
+for e:1 thru numele do (
+[ni,nj] : elenod[e],
+eftab : [3*ni-2,3*ni-1,3*ni,3*nj-2,3*nj-1,3*nj],
+ncoor : [nodxz[ni],nodxz[nj]],
+[Em,G] : elemat[e],
+[A,Iyy,Ks] : elefab[e],
+Ke : K_el_timoshenko_gen_Beam_xz(ncoor,Em,A,Iyy,Ks,G),
+neldof: length(Ke),
+for i:1 thru neldof do(
+ii : eftab[i],
+for j:1 thru neldof do(
+jj : eftab[j],
+K[ii,jj] : K[ii,jj]+Ke[i,j]
+)
+)
+),
+return(K)
+)$
+
+/*
+Generalized Beam Element Internal Forces - XY Plane
+Inputs:
+nodxy Nodal coordinates
+noddis Nodal displacements
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+Output:
+p Internal forces
+*/
+PlaneGenBeamIntForces_xy(nodxy,elenod,elemat,elefab,noddis) :=
+block(
+[numele:length(elenod),e,i,j,ni,nj,ncoor,xi,L,LL,LLL,sin_a,cos_a],
+array(elefor, numele),
+for i:1 thru numele do( elefor[i] : zeromatrix(length(elenod[i]),3)),
+for e:1 thru numele do (
+[ni, nj] : elenod[e],
+ncoor : [nodxy[ni],nodxy[nj]],
+[[x1,y1],[x2,y2]] : ncoor,
+[x21,y21] : [x2-x1,y2-y1],
+LL : (x21^2+y21^2),
+L : sqrt(LL),
+LLL : LL*L,
+sin_a : y21/L,
+cos_a : x21/L,
+for j:1 thru length(elenod[e]) do (
+xi : [-1,+1],
+elefor[e][j,1] : (elemat[e][1]*elefab[e][1]/LL)*(
+x21*(noddis[nj,1] - noddis[ni,1]) +
+y21*(noddis[ni,2] - noddis[nj,2]) ),
+elefor[e][j,2] : (elemat[e][1]*elefab[e][1])*(
+(6/LL)*(-xi[j])*(
+y21*(noddis[ni,1] - noddis[nj,1]) +
+x21*(noddis[ni,2] - noddis[nj,2]))+
+(1/L)*(-1+3*xi[j])*noddis[ni,3]+
+(1/L)*(+1+3*xi[j])*noddis[nj,3]
+),
+elefor[e][j,3] : (elemat[e][1]*elefab[e][1])*(
+(12/LLL)*(-1)*(
+y21*(noddis[ni,1] - noddis[nj,1]) +
+x21*(noddis[ni,2] - noddis[nj,2]))+
+(2/LL)*(+3)*(noddis[ni,3]+noddis[nj,3])
+)
+)
+),
+return(elefor)
+)$
+
+/*
+Generalized Beam Element Internal Forces - XZ Plane
+Inputs:
+nodxz Nodal coordinates
+noddis Nodal displacements
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+Output:
+p Internal forces
+*/
+PlaneGenBeamIntForces_xz(nodxz,elenod,elemat,elefab,noddis) :=
+block([numele:length(elenod),e,i,j,ni,nj,ncoor,xi,L,LL,LLL,sin_a,cos_a],
+array(elefor, numele),
+for i:1 thru numele do( elefor[i] : zeromatrix(length(elenod[i]),3)),
+for e:1 thru numele do (
+[ni, nj] : elenod[e],
+ncoor : [nodxz[ni],nodxz[nj]],
+[[x1,z1],[x2,z2]] : ncoor,
+[x21,z21] : [x2-x1,z2-z1],
+LL : (x21^2+z21^2),
+L : sqrt(LL),
+LLL : LL*L,
+sin_a : z21/L,
+cos_a : x21/L,
+for j:1 thru length(elenod[e]) do (
+xi : [-1,+1],
+elefor[e][j,1] : (elemat[e][1]*elefab[e][1]/LL)*(
+x21*(noddis[nj,1] - noddis[ni,1]) +
+z21*(noddis[ni,2] - noddis[nj,2]) ),
+elefor[e][j,2] : (elemat[e][1]*elefab[e][1])*(
+(6/LL)*(-xi[j])*(
+z21*(noddis[ni,1] - noddis[nj,1]) +
+x21*(noddis[ni,2] - noddis[nj,2]))+
+(1/L)*(-1+3*xi[j])*noddis[ni,3]+
+(1/L)*(+1+3*xi[j])*noddis[nj,3]
+),
+elefor[e][j,3] : (elemat[e][1]*elefab[e][1])*(
+(12/LLL)*(-1)*(
+z21*(noddis[ni,1] - noddis[nj,1]) +
+x21*(noddis[ni,2] - noddis[nj,2]))+
+(2/LL)*(+3)*(noddis[ni,3]+noddis[nj,3])
+)
+)
+),
+return(elefor)
+)$
+
+/*
+Truss Problem - Solution Driver - XY Plane
+Inputs:
+nodxy Nodal coordinates
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+nodtag Nodal freedom tags list
+nodval Nodal freedom values list
+Outputs:
+noddis Nodal displacements
+nodfor Nodal forces
+elefor Element forces
+elesig Element stresses
+*/
+PlaneTrussSolution_xy(nodxy,elenod,elemat,elefab,nodtag,nodval):=
+block([K,Kmod,f,fmod,u,noddis,nodfor,elefor,elesig,eftab,Ke,i,c],
+/* calculate the global stiffness matrix */
+K : K_gl_truss_xy(nodxy,elenod,elemat,elefab),
+/* calculate the modified global stiffness matrix */
+Kmod : ModifiedMasterStiffness(nodtag,K),
+/* calculate the global force matrix */
+f : transpose(FlatNodeVector(nodval)),
+/* calculate the modified force matrix */
+fmod : ModifiedNodeForces(nodtag,nodval,K,f),
+/* solve the system of equation for displacements */
+u : invert(Kmod).fmod,
+/* calculate the forces based on nodal displacements */
+f : float(K.u),
+/* transform f to nodfor (distinguished nodal forces) */
+nodfor : zeromatrix(length(f)/2,2),
+c : 0,
+for i: 1 thru (length(f)/2) do(
+c : c + 1,
+nodfor[i] : args(append(f[(c-1)*2+1],f[(c-1)*2+2]))
+),
+/* transform u to noddis (distinguished nodal displacements) */
+noddis : zeromatrix(length(u)/2,2),
+c : 0,
+for i: 1 thru (length(u)/2) do(
+c : c + 1,
+noddis[i] : args(append(u[(c-1)*2+1],u[(c-1)*2+2]))
+),
+/* calculate elements internal forces */
+elefor : PlaneTrussIntForces_xy(nodxy,elenod,elemat,elefab,noddis),
+/* calculate elements stresses*/
+elesig : PlaneTrussStresses(elefab,elefor),
+return([noddis,nodfor,elefor,elesig])
+)$
+
+/*
+Truss Problem - Solution Driver - XZ Plane
+Inputs:
+nodxz Nodal coordinates
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+nodtag Nodal freedom tags list
+nodval Nodal freedom values list
+Outputs:
+noddis Nodal displacements
+nodfor Nodal forces
+elefor Element forces
+elesig Element stresses
+*/
+PlaneTrussSolution_xz(nodxz,elenod,elemat,elefab,nodtag,nodval):=
+block([K,Kmod,f,fmod,u,noddis,nodfor,elefor,elesig,eftab,Ke,i,c],
+/* calculate the global stiffness matrix */
+K : K_gl_truss_xz(nodxz,elenod,elemat,elefab),
+/* calculate the modified global stiffness matrix */
+Kmod : ModifiedMasterStiffness(nodtag,K),
+/* calculate the global force matrix */
+f : transpose(FlatNodeVector(nodval)),
+/* calculate the modified force matrix */
+fmod : ModifiedNodeForces(nodtag,nodval,K,f),
+/* solve the system of equation for displacements */
+u : invert(Kmod).fmod,
+/* calculate the forces based on nodal displacements */
+f : float(K.u),
+/* transform f to nodfor (distinguished nodal forces) */
+nodfor : zeromatrix(length(f)/2,2),
+c : 0,
+for i: 1 thru (length(f)/2) do(
+c : c + 1,
+nodfor[i] : args(append(f[(c-1)*2+1],f[(c-1)*2+2]))
+),
+/* transform u to noddis (distinguished nodal displacements) */
+noddis : zeromatrix(length(u)/2,2),
+c : 0,
+for i: 1 thru (length(u)/2) do(
+c : c + 1,
+noddis[i] : args(append(u[(c-1)*2+1],u[(c-1)*2+2]))
+),
+/* calculate elements internal forces */
+elefor :PlaneTrussIntForces_xz(nodxz,elenod,elemat,elefab,noddis),
+/* calculate elements stresses*/
+elesig : PlaneTrussStresses(elefab,elefor),
+return([noddis,nodfor,elefor,elesig])
+)$
+
+/*
+Generalized Beam Problem - Solution Driver - XY Plane
+Inputs:
+nodxy Nodal coordinates
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+nodtag Nodal freedom tags list
+nodval Nodal freedom values list
+Outputs:
+noddis Nodal displacements
+857 nodfor Nodal forces
+858 elefor Element forces
+859 */
+GenBeamSolution_xy(nodxy,elenod,elemat,elefab,nodtag,nodval) :=
+block([K,Kmod,f,fmod,u,noddis,nodfor,elefor,i,c],
+/* calculate the global stiffness matrix */
+K:K_gl_beam_xy(nodxy, elenod, elemat, elefab),
+/* calculate the modified global stiffness matrix */
+Kmod : ModifiedMasterStiffness(nodtag, K),
+/* calculate the global force matrix */
+f : transpose(FlatNodeVector(nodval)),
+/* calculate the modified force matrix */
+fmod : ModifiedNodeForces(nodtag, nodval, K, f),
+/* solve the system of equation for displacements */
+u : invert(Kmod).fmod,
+/* calculate the forces based on nodal displacements */
+f : factor(K.u),
+/* transform f to nodfor (distinguished nodal forces) */
+nodfor : zeromatrix(length(f)/3,3),
+c : 0,
+for i: 1 thru (length(f)/3) do(
+c : c + 1,
+nodfor[i] :args(append(f[(c-1)*3+1],f[(c-1)*3+2],f[(c-1)*3+3]))
+),
+/* transform u to noddis (distinguished nodal displacements) */
+noddis : zeromatrix(length(u)/3,3),
+c : 0,
+for i: 1 thru (length(u)/3) do(
+c : c + 1,
+noddis[i] :args(append(u[(c-1)*3+1],u[(c-1)*3+2],u[(c-1)*3+3]))
+),
+/* calculate elements internal forces */
+elefor :PlaneGenBeamIntForces_xy(nodxy,elenod,elemat,elefab,noddis),
+return([noddis,nodfor,elefor])
+)$
+
+/*
+Generalized Beam Problem - Solution Driver - XZ Plane
+Inputs:
+nodxz Nodal coordinates
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+nodtag Nodal freedom tags list
+nodval Nodal freedom values list
+Outputs:
+noddis Nodal displacements
+nodfor Nodal forces
+elefor Element forces
+*/
+GenBeamSolution_xz(nodxz,elenod,elemat,elefab,nodtag,nodval) :=
+block([K,Kmod,f,fmod,u,noddis,nodfor,elefor,i,c],
+/* calculate the global stiffness matrix */
+K:K_gl_beam_xz(nodxz, elenod, elemat, elefab),
+/* calculate the modified global stiffness matrix */
+Kmod : ModifiedMasterStiffness(nodtag, K),
+/* calculate the global force matrix */
+f : transpose(FlatNodeVector(nodval)),
+/* calculate the modified force matrix */
+fmod : ModifiedNodeForces(nodtag, nodval, K, f),
+/* solve the system of equation for displacements */
+u : invert(Kmod).fmod,
+/* calculate the forces based on nodal displacements */
+f : factor(K.u),
+/* transform f to nodfor (distinguished nodal forces) */
+nodfor : zeromatrix(length(f)/3,3),
+c : 0,
+for i: 1 thru (length(f)/3) do(
+c : c + 1,
+nodfor[i] :args(append(f[(c-1)*3+1],f[(c-1)*3+2],f[(c-1)*3+3]))
+),
+/* transform u to noddis (distinguished nodal displacements) */
+noddis : zeromatrix(length(u)/3,3),
+c : 0,
+for i: 1 thru (length(u)/3) do(
+c : c + 1,
+noddis[i] :args(append(u[(c-1)*3+1],u[(c-1)*3+2],u[(c-1)*3+3]))
+),
+/* calculate elements internal forces */
+elefor :PlaneGenBeamIntForces_xz(nodxz,elenod,elemat,elefab,noddis),
+return([noddis,nodfor,elefor])
+)$
+
+/*
+Generalized Timoshenko Beam Problem - Solution Driver - XY Plane
+Inputs:
+nodxy Nodal coordinates
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+nodtag Nodal freedom tags list
+nodval Nodal freedom values list
+Outputs:
+noddis Nodal displacements
+nodfor Nodal forces
+elefor Element forces
+*/
+Timoshenko_GenBeamSolution_xy
+(nodxy,elenod,elemat,elefab,nodtag,nodval) :=
+block([K,Kmod,f,fmod,u,noddis,nodfor,elefor,i,c],
+/* calculate the global stiffness matrix */
+K:K_gl_timoshenko_beam_xy(nodxy, elenod, elemat, elefab),
+/* calculate the modified global stiffness matrix */
+Kmod : ModifiedMasterStiffness(nodtag, K),
+/* calculate the global force matrix */
+f : transpose(FlatNodeVector(nodval)),
+/* calculate the modified force matrix */
+fmod : ModifiedNodeForces(nodtag, nodval, K, f),
+/* solve the system of equation for displacements */
+u : invert(Kmod).fmod,
+/* calculate the forces based on nodal displacements */
+f : factor(K.u),
+/* transform f to nodfor (distinguished nodal forces) */
+nodfor : zeromatrix(length(f)/3,3),
+c : 0,
+for i: 1 thru (length(f)/3) do(
+c : c + 1,
+nodfor[i] :args(append(f[(c-1)*3+1],f[(c-1)*3+2],f[(c-1)*3+3]))
+),
+/* transform u to noddis (distinguished nodal displacements) */
+noddis : zeromatrix(length(u)/3,3),
+c : 0,
+for i: 1 thru (length(u)/3) do(
+c : c + 1,
+noddis[i] :args(append(u[(c-1)*3+1],u[(c-1)*3+2],u[(c-1)*3+3]))
+),
+/* calculate elements internal forces */
+elefor :PlaneGenBeamIntForces_xy(nodxy,elenod,elemat,elefab,noddis),
+return([noddis,nodfor,elefor])
+)$
+
+/*
+Generalized Timoshenko Beam Problem - Solution Driver - XZ Plane
+Inputs:
+nodxz Nodal coordinates
+elenod Element end nodes
+elemat Element material properties
+elefab Element fabrication properties
+nodtag Nodal freedom tags list
+nodval Nodal freedom values list
+Outputs:
+noddis Nodal displacements
+nodfor Nodal forces
+elefor Element forces
+*/
+Timoshenko_GenBeamSolution_xz
+(nodxz,elenod,elemat,elefab,nodtag,nodval) :=
+block([K,Kmod,f,fmod,u,noddis,nodfor,elefor,i,c],
+/* calculate the global stiffness matrix */
+K:K_gl_timoshenko_beam_xz(nodxz,elenod,elemat,elefab),
+/* calculate the modified global stiffness matrix */
+Kmod : ModifiedMasterStiffness(nodtag,K),
+/* calculate the global force matrix */
+f : transpose(FlatNodeVector(nodval)),
+/* calculate the modified force matrix */
+fmod : ModifiedNodeForces(nodtag, nodval,K,f),
+/* solve the system of equation for displacements */
+u : invert(Kmod).fmod,
+/* calculate the forces based on nodal displacements */
+f : factor(K.u),
+/* transform f to nodfor (distinguished nodal forces) */
+nodfor : zeromatrix(length(f)/3,3),
+c : 0,
+for i: 1 thru (length(f)/3) do(
+c : c + 1,
+nodfor[i] :args(append(f[(c-1)*3+1],f[(c-1)*3+2],f[(c-1)*3+3]))
+),
+/* transform u to noddis (distinguished nodal displacements) */
+noddis : zeromatrix(length(u)/3,3),
+c : 0,
+for i: 1 thru (length(u)/3) do(
+c : c + 1,
+noddis[i] :args(append(u[(c-1)*3+1],u[(c-1)*3+2],u[(c-1)*3+3]))
+),
+/* calculate elements internal forces */
+elefor :PlaneGenBeamIntForces_xz(nodxz,elenod,elemat,elefab,noddis),
+return([noddis,nodfor,elefor])
+)$
+
+
+/* PRINT MODULES */
+PrintPlaneNodeCoordinatesSymb(nodxy) :=
+block([table,header,i],
+table : zeromatrix(length(nodxy)+1,3),
+table[1] : ["node", "x-coor", "y-coor"],
+for i : 2 thru length(nodxy)+1 do (
+table[i] : args(append([i-1],nodxy[i-1]))),
+return(table)
+)$
+
+PrintPlaneNodeCoordinatesSymb_xz(nodxz) :=
+block([table,header,i],
+table : zeromatrix(length(nodxz)+1,3),
+table[1] : ["node", "x-coor", "z-coor"],
+for i : 2 thru length(nodxz)+1 do (
+table[i] : args(append([i-1],nodxz[i-1]))),
+return(table)
+)$
+
+PrintPlaneTrussElementDataSymb(elenod,elemat,elefab) :=
+block([table,header,i],
+table : zeromatrix(length(elenod)+1,4),
+table[1] : ["elem", "nodes", " modulus ", "area"],
+for i : 2 thru length(elenod)+1 do (
+table[i] :
+args(append([i-1],[elenod[i-1]],[elemat[i-1]],[elefab[i-1]]))),
+return(table)
+)$
+
+
+PrintPlaneTrussFreedomActivitySymb(nodtag,nodval) :=
+block([table,header,i],
+table : zeromatrix(length(nodtag)+1,5),
+table[1] : [" node", " x-tag", " y-tag",
+" x-value", " y-value"],
+for i : 2 thru length(nodtag)+1 do (
+table[i] : args(append([i-1],nodtag[i-1],nodval[i-1]))),
+return(table)
+)$
+
+PrintPlaneTrussFreedomActivitySymb_xz(nodtag,nodval) :=
+block([table,header,i],
+table : zeromatrix(length(nodtag)+1,5),
+table[1] : [" node", " x-tag", " z-tag",
+" x-value", " z-value"],
+for i : 2 thru length(nodtag)+1 do (
+table[i] : args(append([i-1],nodtag[i-1],nodval[i-1]))),
+return(table)
+)$
+
+PrintPlaneTrussNodeDisplacementsSymb(noddis) :=
+block([table,header,i],
+table : zeromatrix(length(noddis)+1,3),
+table[1] : ["node", "x-displ", "y-displ"],
+for i : 2 thru length(noddis)+1 do (
+table[i] : args(append([i-1],noddis[i-1]))),
+return(table)
+)$
+
+PrintPlaneTrussNodeDisplacementsSymb_xz(noddis) :=
+block([table,header,i],
+table : zeromatrix(length(noddis)+1,3),
+table[1] : ["node", "x-displ", "z-displ"],
+for i : 2 thru length(noddis)+1 do (
+table[i] : args(append([i-1],noddis[i-1]))),
+return(table)
+)$
+
+PrintPlaneTrussNodeForcesSymb(nodfor) :=
+block([table,header,i],
+table : zeromatrix(length(nodfor)+1,3),
+table[1] : ["node","x-force","y-force"],
+for i : 2 thru length(nodfor)+1 do (
+table[i] : args(append([i-1],nodfor[i-1]))),
+return(table)
+)$
+
+PrintPlaneTrussNodeForcesSymb_xz(nodfor) :=
+block([table,header,i],
+table : zeromatrix(length(nodfor)+1,3),
+table[1] : ["node","x-force","z-force"],
+for i : 2 thru length(nodfor)+1 do (
+table[i] : args(append([i-1],nodfor[i-1]))),
+return(table)
+)$
+
+PrintPlaneElemForcesAndStressesSymb(elefor,elesig) :=
+block([table,header,i],
+table : zeromatrix(length(elefor)+1,3),
+table[1] : ["elem","axial force","axial stress"],
+for i : 2 thru length(elefor)+1 do (
+table[i] : args([i-1,elefor[i-1],elesig[i-1]])),
+return(table)
+)$
+
+PrintPlaneGenBeamNodeDOFsSymb(noddis) :=
+block([table,header,i],
+table : zeromatrix(length(noddis)+1,4),
+table[1] : ["node", "x-displ", "y-displ", "z-rot"],
+for i : 2 thru length(noddis)+1 do (
+table[i] : args(append([i-1],noddis[i-1]))),
+return(table)
+)$
+
+PrintPlaneGenBeamNodeDOFsSymb_xz(noddis) :=
+block([table,header,i],
+table : zeromatrix(length(noddis)+1,4),
+table[1] : ["node", "x-displ", "z-displ", "y-rot"],
+for i : 2 thru length(noddis)+1 do (
+table[i] : args(append([i-1],noddis[i-1]))),
+return(table)
+)$
+
+PrintPlaneGenBeamElementDataSymb(elenod,elemat,elefab) :=
+block([table,header,i],
+table : zeromatrix(length(elenod)+1,4),
+table[1] : ["elem", "nodes", " modulus ", "fabrication"],
+for i : 2 thru length(elenod)+1 do (
+table[i] :
+args(append([i-1],[elenod[i-1]],[elemat[i-1]],[elefab[i-1]]))),
+return(table)
+)$
+
+PrintPlaneGenBeamFreedomActivitySymb(nodtag,nodval) :=
+block([table,header,i],
+table : zeromatrix(length(nodtag)+1,7),
+table[1] : [" node", "x-tag", "y-tag", "zrot-tag",
+"x-value", "y-value","zrot-value"],
+for i : 2 thru length(nodtag)+1 do (
+table[i] : args(append([i-1],nodtag[i-1],nodval[i-1]))),
+return(table)
+)$
+
+PrintPlaneGenBeamFreedomActivitySymb_xz(nodtag,nodval) :=
+block([table,header,i],
+table : zeromatrix(length(nodtag)+1,7),
+table[1] : [" node", "x-tag", "z-tag", "yrot-tag",
+"x-value", "z-value","yrot-value"],
+for i : 2 thru length(nodtag)+1 do (
+table[i] : args(append([i-1],nodtag[i-1],nodval[i-1]))),
+return(table)
+)$
+
+PrintPlaneGenBeamNodeForcesSymb(nodfor) :=
+block([table,header,i],
+table : zeromatrix(length(nodfor)+1,4),
+table[1] : ["node","x-force","y-force","Bending-moment"],
+for i : 2 thru length(nodfor)+1 do (
+table[i] : args(append([i-1],nodfor[i-1]))),
+return(table)
+)$
+
+PrintPlaneGenBeamNodeForcesSymb_xz(nodfor) :=
+block([table,header,i],
+table : zeromatrix(length(nodfor)+1,4),
+table[1] : ["node","x-force","z-force","Bending-moment"],
+for i : 2 thru length(nodfor)+1 do (
+table[i] : args(append([i-1],nodfor[i-1]))),
+return(table)
+)$
+
+PrintPlaneGenBeamElemForcesSymb(l_elefor) :=
+block([table,header,i],
+table : zeromatrix(length(l_elefor)+1,4),
+table[1] :
+["local-node","Normal-force","Bending-moment","Shear-force"],
+for i : 2 thru length(l_elefor)+1 do (
+table[i] : args(append([i-1],l_elefor[i-1]))),
+return(table)
+)$
+
+/*
+options:
+symb : symbolic input
+nume : numerical input
+*/
+
+PrintPlaneTrussNodeCoordinates(NodeCoordinates,option) :=
+block([table,header,i],
+table : zeromatrix(length(NodeCoordinates),3),
+header : ["node", "x-coor", "y-coor"],
+for i : 1 thru length(NodeCoordinates) do (
+table[i] : args(append([i],NodeCoordinates[i]))),
+printf(true," Node coordinates: ~%"),
+printf(true,"~%"),
+if (option=symb) then
+(printf(true,"~{~8t~9a~8t~15a~8t~15a~}~%",header),
+printf(true,"~{~{~8t~9a~8t~15a~8t~15a~}~%~}",table))
+else
+(printf(true," ~{ ~12a~}~%",header),
+printf(true,"~{~{~9d ~12,6f ~12,6f ~}~%~}",table)),
+return("")
+)$
+
+PrintPlaneTrussElementData
+(ElemNodes,ElemMaterials,ElemFabrications,option) :=
+block([table,header,i],
+table : zeromatrix(length(ElemNodes),5),
+for i : 1 thru length(ElemNodes) do (
+table[i] :
+args(
+append([i],ElemNodes[i],[ElemMaterials[i]],[ElemFabrications[i]]))),
+printf(true," Element data: ~%"),
+printf(true,"~%"),
+if (option=symb) then
+(header : ["elem", "nodes", "modulus", "area"],
+printf(true,"~{~8t~8a ~8t~14a ~8t~12a~8t~12a~%~\}",header),
+printf(true,"~{~8t~{~9a~t[~2a, ~2a] ~12a~12a~}~%~}",table))
+else
+(header : [" elem", " nodes", "modulus", " area"],
+printf(true,"~{~2t~<~12a~>~}~%",header),
+printf(true,"~{~{~9d ~t[~2d, ~2d] ~12,2f~12,2f~}~%~}",table)),
+return("")
+)$
+
+
+PrintPlaneTrussFreedomActivity(NodeDOFTags,NodeDOFValues,option) :=
+block([table,header,i],
+table : zeromatrix(length(NodeDOFTags),5),
+header : [" node", " x-tag", " y-tag",
+" x-value", " y-value"],
+for i : 1 thru length(NodeDOFTags) do (
+table[i] : args(append([i],NodeDOFTags[i],NodeDOFValues[i]))),
+printf(true," DOF activity: ~%"),
+printf(true,"~%"),
+if (option=symb) then
+(header : ["node", "x-tag", "y-tag",
+"x-value", "y-value"],
+printf(true,"~{~8t~12a~}~%",header),
+printf(true,"~{~{~8t~12a~}~%~}",table))
+else
+(header : [" node", " x-tag", " y-tag",
+" x-value", " y-value"],
+printf(true,"~{~9a~}~%",header),
+printf(true,"~{~{~9d~}~%~}",table)),
+return("")
+)$
+
+PrintPlaneTrussNodeDisplacements(noddis,option) :=
+block([table,header,i],
+table : zeromatrix(length(noddis),3),
+for i : 1 thru length(noddis) do (
+table[i] : args(append([i],noddis[i]))),
+printf(true," Computed node displacements: ~%"),
+printf(true,"~%"),
+if (option=symb) then
+(header : ["node", "x-displ", "y-displ"],
+printf(true,"~{~8t~9a~8t~15a~8t~15a~}~%",header),
+printf(true,"~{~{~8t~9a~8t~15a~8t~15a~}~%~}",table))
+else
+(header : [" node", " x-displ", " y-displ"],
+printf(true,"~{ ~9a~}~%",header),
+printf(true,"~{~{~9d ~12,6f ~12,6f ~}~%~}",table)),
+return("")
+)$
+
+PrintPlaneTrussNodeForces(nodfor,option) :=
+block([table,header,i],
+table : zeromatrix(length(nodfor),3),
+for i : 1 thru length(nodfor) do (
+table[i] : args(append([i],nodfor[i]))),
+printf(true," Node Forces including reactions: ~%"),
+printf(true,"~%"),
+if (option=symb) then
+(header : ["node", "x-force", "y-force"],
+printf(true,"~{~8t~9a~8t~15a~8t~15a~}~%",header),
+printf(true,"~{~{~8t~9a~8t~15a~8t~15a~}~%~}",table))
+else
+(header : [" node", " x-force", " y-force"],
+printf(true,"~{ ~9a~}~%",header),
+printf(true,"~{~{~9d ~12,4f ~12,4f~}~%~}",table)),
+return("")
+)$
+
+PrintPlaneElemForcesAndStresses(elefor,elesig,option) :=
+block([table,header,i],
+table : zeromatrix(length(elefor),3),
+for i : 1 thru length(elefor) do (
+table[i] : args([i,elefor[i],elesig[i]])),
+printf(true," Int Forces and Stresses: ~%"),
+printf(true,"~%"),
+if (option=symb) then
+(header : ["elem", "axial force", "axial stress"],
+printf(true,"~{~8t~9a~8t~15a~8t~15a~}~%",header),
+printf(true,"~{~{~8t~9a~8t~15a~8t~15a~}~%~}",table))
+else
+(header : [" elem", " axial force", " axial stress"],
+printf(true,"~{ ~9a~}~%",header),
+printf(true,"~{~{~9d ~14,4f ~14,4f~}~%~}",table)),
+return("")
+)$
